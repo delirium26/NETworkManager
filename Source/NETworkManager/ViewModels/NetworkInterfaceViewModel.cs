@@ -52,6 +52,20 @@ namespace NETworkManager.ViewModels
             }
         }
 
+        private bool _interfaceEnabled;
+        public bool InterfaceEnabled
+        {
+            get => _interfaceEnabled;
+            set
+            {
+                if (value == _interfaceEnabled)
+                    return;
+
+                _interfaceEnabled = value;
+                OnPropertyChanged();
+            }
+        }        
+
         private bool _isConfigurationRunning;
         public bool IsConfigurationRunning
         {
@@ -120,6 +134,7 @@ namespace NETworkManager.ViewModels
 
                 if (value != null)
                 {
+                    IsConfigurationRunning = true;
                     if (!_isLoading)
                         SettingsManager.Current.NetworkInterface_SelectedInterfaceId = value.Id;
 
@@ -145,6 +160,9 @@ namespace NETworkManager.ViewModels
                     DetailsDNSServer = value.DNSServer;
 
                     // Configuration
+
+                    InterfaceEnabled = value.InterfaceEnabled;
+
                     if (value.DhcpEnabled)
                     {
                         ConfigEnableDynamicIPAddress = true;
@@ -171,6 +189,7 @@ namespace NETworkManager.ViewModels
                     }
 
                     CanConfigure = value.IsOperational;
+                    IsConfigurationRunning = false;
                 }
 
                 _selectedNetworkInterface = value;
@@ -957,6 +976,44 @@ namespace NETworkManager.ViewModels
             };
 
             await _dialogCoordinator.ShowMetroDialogAsync(this, customDialog);
+        }
+
+        public ICommand EnableInterfaceCommand
+        {
+            get { return new RelayCommand(p => EnableInterfaceAction()); }
+        }
+
+        private async void EnableInterfaceAction()
+        {
+            if (IsConfigurationRunning)
+                return;
+
+            IsConfigurationRunning = true;
+            DisplayStatusMessage = false;
+
+            var name = SelectedNetworkInterface.Name;
+            await Models.Network.NetworkInterface.EnableInterfaceAsync(name);
+            
+            IsConfigurationRunning = false;
+        }
+
+        public ICommand DisableInterfaceCommand
+        {
+            get { return new RelayCommand(p => DisableInterfaceAction()); }
+        }
+
+        private async void DisableInterfaceAction()
+        {
+            if (IsConfigurationRunning)
+                return;
+
+            IsConfigurationRunning = true;
+            DisplayStatusMessage = false;
+
+            var name = SelectedNetworkInterface.Name;
+            await Models.Network.NetworkInterface.DisableInterfaceAsync(name);
+            
+            IsConfigurationRunning = false;
         }
 
         public ICommand FlushDNSCommand

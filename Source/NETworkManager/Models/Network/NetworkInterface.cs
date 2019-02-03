@@ -7,6 +7,11 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 
+using System.Diagnostics;
+using System.Management;
+using static System.Management.ManagementObject;
+
+
 namespace NETworkManager.Models.Network
 {
     public class NetworkInterface
@@ -106,6 +111,7 @@ namespace NETworkManager.Models.Network
                     PhysicalAddress = networkInterface.GetPhysicalAddress(),
                     Status = networkInterface.OperationalStatus,
                     IsOperational = networkInterface.OperationalStatus == OperationalStatus.Up,
+                    InterfaceEnabled = true,
                     Speed = networkInterface.Speed,
                     IPv4Address = listIPv4Address.ToArray(),
                     Subnetmask = listSubnetmask.ToArray(),
@@ -123,6 +129,75 @@ namespace NETworkManager.Models.Network
                 });
             }
 
+            Console.WriteLine("Id\t| Name\t| Descr\t| Type\t| MAC\t| Status\t| IsOp\t| Speed\t| addr\t| Sub\t|");
+            foreach (var i in listNetworkInterfaceInfo)
+            {
+                Console.Write(i.Id + "\t| ");
+                Console.Write(i.Name + "\t\t| ");
+                Console.Write(i.Description + "\t\t| ");
+                Console.Write(i.Type + "\t| ");
+                Console.Write(i.PhysicalAddress + "\t| ");
+                Console.Write(i.Status + "\t| ");
+                Console.Write(i.IsOperational + "\t| ");
+                Console.Write(i.Speed + "\t| ");
+                Console.Write(i.IPv4Address + "\t| ");
+                Console.Write(i.Subnetmask + "\t| ");
+                Console.WriteLine();
+            }
+
+            //Select only physical interfaces https://weblogs.sqlteam.com/mladenp/2010/11/04/find-only-physical-network-adapters-with-wmi-win32_networkadapter-class/
+            SelectQuery wmiQuery = new SelectQuery(@"SELECT * 
+                                                     FROM   Win32_NetworkAdapter 
+                                                     WHERE  Manufacturer != 'Microsoft'
+                                                     AND NetEnabled = False");
+            // WHERE  Manufacturer != 'Microsoft'                                      
+            // AND NOT PNPDeviceID LIKE 'ROOT\\%'   
+            ManagementObjectSearcher searchProcedure = new ManagementObjectSearcher(wmiQuery);
+            foreach (ManagementObject networkInterface in searchProcedure.Get())
+            {
+                //item.InvokeMethod("Enable", null);
+                Console.WriteLine(networkInterface["GUID"]);
+                Console.WriteLine(networkInterface["Name"]);
+                // NetConnectionStatus status codes https://blogs.technet.microsoft.com/heyscriptingguy/2007/08/21/how-can-i-tell-if-a-wireless-network-adapter-is-connected-to-the-network/
+                Console.WriteLine(networkInterface["Description"]);
+                Console.WriteLine(networkInterface["MACAddress"]);
+                Console.WriteLine(networkInterface["Speed"]);
+                Console.WriteLine(networkInterface["NetEnabled"]);
+                
+                //Console.WriteLine((string[])networkInterface["NetworkAddresses"]);
+                var zeroAddress = IPAddress.Parse("0.0.0.0");
+                var zeroAddresses = new List<IPAddress>();
+                zeroAddresses.Add(zeroAddress);
+                listNetworkInterfaceInfo.Add(new NetworkInterfaceInfo                    
+                {
+                    Id = networkInterface["GUID"].ToString(),
+                    Name = networkInterface["Name"].ToString(),
+                    Description = networkInterface["Description"].ToString(),
+                    //Type - Win32_NetworkAdapter have no propety Type
+                    Type = "Unknown",
+                    PhysicalAddress = PhysicalAddress.Parse("00-00-00-00-00-00"),
+                    Status = OperationalStatus.Down,
+                    IsOperational = false,
+                    InterfaceEnabled = false,
+                    Speed = 0,
+                    IPv4Address = zeroAddresses.ToArray(),
+                    Subnetmask = zeroAddresses.ToArray(),
+                    IPv4Gateway = zeroAddresses.ToArray(),
+                    DhcpEnabled = false,
+                    DhcpServer = zeroAddresses.ToArray(),
+                    DhcpLeaseObtained = new DateTime(),
+                    DhcpLeaseExpires = new DateTime(),
+                    IPv6AddressLinkLocal = zeroAddresses.ToArray(),
+                    IPv6Address = zeroAddresses.ToArray(),
+                    IPv6Gateway = zeroAddresses.ToArray(),
+                    DNSAutoconfigurationEnabled = false,
+                    DNSSuffix = "123",
+                    DNSServer = zeroAddresses.ToArray()
+                    //IPv4Address = IPAddress.Parse(networkInterface["NetworkAddresses"].ToString()),
+                });
+                
+            }
+            
             return listNetworkInterfaceInfo;
         }
 
@@ -157,6 +232,30 @@ namespace NETworkManager.Models.Network
                         throw;
                 }
             }
+        }
+
+        public static Task EnableInterfaceAsync(string name)
+        {
+            return Task.Run(() => EnableInterface(name));
+        }
+
+        public static void EnableInterface(string name)
+        {
+            var command = @"Enable-NetAdapter -InterfaceDescription '" + name + "'  -Confirm:$false";
+
+            PowerShellHelper.ExecuteCommand(command, true);
+        }
+
+        public static Task DisableInterfaceAsync(string name)
+        {
+            return Task.Run(() => DisableInterface(name));
+        }        
+
+        public static void DisableInterface(string name)
+        {
+            var command = @"Disable-NetAdapter -Name '" + name + "'  -Confirm:$false";
+
+            PowerShellHelper.ExecuteCommand(command, true);
         }
 
         public static Task FlushDnsAsync()

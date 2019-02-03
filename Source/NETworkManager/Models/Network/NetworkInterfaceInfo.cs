@@ -15,6 +15,7 @@ namespace NETworkManager.Models.Network
         public PhysicalAddress PhysicalAddress { get; set; }
         public OperationalStatus Status { get; set; }
         public bool IsOperational { get; set; }
+        public bool InterfaceEnabled { get; set; }
         public long Speed { get; set; }
         public IPAddress[] IPv4Address { get; set; }
         public IPAddress[] Subnetmask { get; set; }
